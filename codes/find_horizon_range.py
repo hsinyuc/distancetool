@@ -1,7 +1,7 @@
 """
 Calculate the horizon and range for a given 
 binary. The horizon is defined as the distance at which a face-on and overhead (ideally located) binary is detected 
-with SNR=snr_threshold with a single IFO. It represents the farthest this binary could be detected above threshold. 
+with SNR=snr_threshold with single IFO. It represents the farthest this binary could be detected above threshold. 
 There are two definitions of range being discussed at this point, 
 
 [1]
@@ -123,7 +123,7 @@ def find_horizon_range(m1,m2,asdfile,approx=ls.IMRPhenomD):
 	horizon_redshift=guess_redshift
 	
 	#sampled universal antenna power pattern for code sped up
-	w_sample,P_sample=genfromtxt("/Users/hsinyuc/research/followup/data/Pw_single.dat",unpack=True)
+	w_sample,P_sample=genfromtxt("../data/Pw_single.dat",unpack=True)
 	P=interp1d(w_sample, P_sample,bounds_error=False,fill_value=0.0)
 	n_zstep=100
 
@@ -143,11 +143,3 @@ def find_horizon_range(m1,m2,asdfile,approx=ls.IMRPhenomD):
 	range_3=cd.luminosity_distance(range_redshift[0],**cosmo)
 	
 	return horizon_redshift,cd.luminosity_distance(horizon_redshift,**cosmo), range_2, range_3, vol_sum
-
-m1=30.
-m2=30.
-approx=ls.IMRPhenomD
-asdfile = '/Users/hsinyuc/research/followup/data/2015-10-01_H1_O1_Sensitivity_strain_asd.txt'
-#asdfile='/Users/hsinyuc/research/followup/data/2016-12-13_C01_L1_O2_Sensitivity_strain_asd.txt'
-
-print find_horizon_range(m1,m2,asdfile,approx=approx)
