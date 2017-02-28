@@ -2,14 +2,6 @@
 Calculate the horizon and range for a given 
 binary. The horizon is defined as the distance at which a face-on and overhead (ideally located) binary is detected 
 with SNR=snr_threshold with single IFO. It represents the farthest this binary could be detected above threshold. 
-There are two definitions of range being discussed at this point, 
-
-[1]
-Detectable comoving volume--V_detect
-range=(V_detect*3/4/pi)^(1/3)
-
-[2]
-Take the value in [1], that we assume to be a comoving distance, and convert it to the luminosity distance.
 
 Usage:
 
@@ -23,7 +15,11 @@ Optional inputs--
 approx: frequency domain waveform. Default is IMRPhenomD.
 
 Output--
-Horizon redshift,Horizon luminosity distance (Mpc), range defined in [1] (Mpc), range defined in [2] (Mpc), detectable comoving volume (Mpc^3)
+Horizon redshift, 
+Horizon luminosity distance (Mpc), 
+50% of the detected sources lie within the luminosity distance (Mpc), 
+90% of the detected sources lie within the luminosity distance (Mpc), 
+detectable comoving volume (Mpc^3)
 
 Author: 
 Hsin-Yu Chen (hsin-yu.chen@ligo.org)
@@ -46,9 +42,6 @@ cosmo = {'omega_M_0':0.308, 'omega_lambda_0':0.692, 'omega_k_0':0.0, 'h':0.678}
 def findzfromDL(z,DL):
     return DL-cd.luminosity_distance(z, **cosmo)
     
-##find redshift for a given luminosity distance
-def findzfromDC(z,DC):
-    return DC-cd.comoving_distance(z, **cosmo)
     
 ##estimate the horizon for recursive evaluation in the main code
 def horizon_dist_eval(orig_dist,snr,z0):
@@ -129,17 +122,20 @@ def find_horizon_range(m1,m2,asdfile,approx=ls.IMRPhenomD):
 
 	z,dz=linspace(horizon_redshift,0,n_zstep,endpoint=False,retstep=True)
 	dz=abs(dz)
-	vol_sum=0
+	unit_volume=zeros(size(z))
 	for i in range(0,size(z)):	
 		hplus_tilda,hcross_tilda,freqs = get_htildas((1.+z[i])*m1,(1.+z[i])*m2 ,cd.luminosity_distance(z[i],**cosmo) ,fmin=fmin,fref=fref,df=df,approx=approx)
 		fsel=logical_and(freqs>minimum_freq,freqs<maximum_freq)
 		psd_interp = interpolate_psd(freqs[fsel])  
 		optsnr_z=compute_horizonSNR(hplus_tilda,psd_interp,fsel,df)
 		w=snr_th/optsnr_z
-		vol_sum=vol_sum+(cd.comoving_volume(z[i]+dz/2.,**cosmo)-cd.comoving_volume(z[i]-dz/2.,**cosmo))/(1.+z[i])*P(w)
+		unit_volume[i]=(cd.comoving_volume(z[i]+dz/2.,**cosmo)-cd.comoving_volume(z[i]-dz/2.,**cosmo))/(1.+z[i])*P(w)
+	vol_sum=sum(unit_volume)
+	#Find out the redshifts that 50%/90% of the sources lie within
+	z50=max(z[where(cumsum(unit_volume)>=0.5*vol_sum)])
+	z90=max(z[where(cumsum(unit_volume)>=0.1*vol_sum)])
 	
-	range_2=(vol_sum*3/4./pi)**(1./3.)
-	range_redshift,res=leastsq(findzfromDC,z0,args=range_2)
-	range_3=cd.luminosity_distance(range_redshift[0],**cosmo)
+	return horizon_redshift,cd.luminosity_distance(horizon_redshift,**cosmo), cd.luminosity_distance(z50,**cosmo),  cd.luminosity_distance(z90,**cosmo), vol_sum
 	
-	return horizon_redshift,cd.luminosity_distance(horizon_redshift,**cosmo), range_2, range_3, vol_sum
+
+
