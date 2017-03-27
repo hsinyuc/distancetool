@@ -19,6 +19,7 @@ Horizon redshift,
 Horizon luminosity distance (Mpc), 
 50% of the detected sources lie within the luminosity distance (Mpc), 
 90% of the detected sources lie within the luminosity distance (Mpc), 
+range in comoving distance (Mpc)
 detectable comoving volume (Mpc^3)
 
 Author: 
@@ -41,8 +42,7 @@ cosmo = {'omega_M_0':0.308, 'omega_lambda_0':0.692, 'omega_k_0':0.0, 'h':0.678}
 ##find redshift for a given luminosity distance
 def findzfromDL(z,DL):
     return DL-cd.luminosity_distance(z, **cosmo)
-    
-    
+        
 ##estimate the horizon for recursive evaluation in the main code
 def horizon_dist_eval(orig_dist,snr,z0):
     guess_dist=orig_dist*snr/snr_th
@@ -59,9 +59,9 @@ def get_htildas(m1,m2,dist,
 		   s2x=0.0, 
 		   s2y=0.0, 
 		   s2z=0.0, 
-		   fmin=10.,
+		   fmin=1.,
 		   fmax=0.,
-		   fref=10.,  
+		   fref=1.,  
 		   iota=0., 
 		   lambda1=0., 
 		   lambda2=0., 
@@ -79,16 +79,19 @@ def get_htildas(m1,m2,dist,
 def compute_horizonSNR(hplus_tilda,psd_interp,fsel,df):
 	return sqrt(4.*df*sum(abs(hplus_tilda[fsel])**2/psd_interp))        
 
+def sfr(z):
+    return 0.015*(1.+z)**2.7/(1.+(1.+z)/2.9)**5.6  #msun per yr per Mpc^3
+
 #calculate the horizon distance/redshift
 def find_horizon_range(m1,m2,asdfile,approx=ls.IMRPhenomD):
 
-	fmin=10.
-	fref=10.
+	fmin=1.
+	fref=1.
 	df=1e-2
 	
-	input_freq,strain=loadtxt(asdfile,unpack=True)
-	minimum_freq=maximum(10.,min(input_freq))
-	maximum_freq=minimum(5000.,max(input_freq))
+	input_freq,strain=loadtxt(asdfile,unpack=True,usecols=[0,1])
+	minimum_freq=maximum(min(input_freq),fmin)
+	maximum_freq=minimum(max(input_freq),5000.)
 	interpolate_psd = interp1d(input_freq, strain**2)	
 		
 	#initial guess of horizon redshift and luminosity distance
@@ -99,13 +102,16 @@ def find_horizon_range(m1,m2,asdfile,approx=ls.IMRPhenomD):
 	psd_interp = interpolate_psd(freqs[fsel]) 	
 	input_snr=compute_horizonSNR(hplus_tilda,psd_interp,fsel,df)
 
-	input_redshift=z0; guess_snr=0    
+	input_redshift=z0; guess_snr=0; njump=0
 	#evaluate the horizon recursively
-	while abs(guess_snr-snr_th)>snr_th*0.001: #require the error within 0.1%
-		guess_redshift,guess_dist=horizon_dist_eval(input_dist,input_snr,input_redshift) #horizon guess based on the old SNR		
-		
-		#observer frame or source frame masses
-		hplus_tilda,hcross_tilda,freqs= get_htildas((1.+guess_redshift)*m1,(1.+guess_redshift)*m2 ,guess_dist,iota=0.,fmin=fmin,fref=fref,df=df,approx=approx)
+	while abs(guess_snr-snr_th)>snr_th*0.001 and njump<20: #require the error within 0.1%
+		try:
+			guess_redshift,guess_dist=horizon_dist_eval(input_dist,input_snr,input_redshift) #horizon guess based on the old SNR		
+			hplus_tilda,hcross_tilda,freqs= get_htildas((1.+guess_redshift)*m1,(1.+guess_redshift)*m2 ,guess_dist,iota=0.,fmin=fmin,fref=fref,df=df,approx=approx)
+		except RuntimeError:
+			print "Will try interpolation."
+		except ValueError:
+			print "Will try interpolation."
 		fsel=logical_and(freqs>minimum_freq,freqs<maximum_freq)
 		psd_interp = interpolate_psd(freqs[fsel]) 		
 		guess_snr=compute_horizonSNR(hplus_tilda,psd_interp,fsel,df) #calculate the new SNR
@@ -113,29 +119,59 @@ def find_horizon_range(m1,m2,asdfile,approx=ls.IMRPhenomD):
 		input_snr=guess_snr
 		input_redshift=guess_redshift
 		input_dist=guess_dist
+		njump+=1
 	horizon_redshift=guess_redshift
-	
+
+	#at high redshift the recursive jumps lead to too big a jump for each step, and the recursive loop converge slowly.
+	#so I interpolate the z-SNR curve directly.	
+	if njump>=20:
+		print "Recursive search for the horizon failed. Interpolation instead."
+		try:
+			interp_z=linspace(0.001,100,200); interp_snr=zeros(size(interp_z))
+			for i in range(0,size(interp_z)): 
+				hplus_tilda,hcross_tilda,freqs= get_htildas((1.+interp_z[i])*m1,(1.+interp_z[i])*m2 ,cd.luminosity_distance(interp_z[i],**cosmo),fmin=fmin,fref=fref,df=df,approx=approx)
+				fsel=logical_and(freqs>minimum_freq,freqs<maximum_freq)
+				psd_interp = interpolate_psd(freqs[fsel]) 	
+
+				interp_snr[i]=compute_horizonSNR(hplus_tilda,psd_interp,fsel,df)	
+			interpolate_snr = interp1d(interp_snr[::-1],interp_z[::-1])
+			horizon_redshift= interpolate_snr(snr_th)	
+		except RuntimeError: #If the sources lie outside the given interpolating redshift the sources can not be observe, so I cut down the interpolation range.
+			interpolate_snr = interp1d(interp_snr[::-1],interp_z[::-1])
+			horizon_redshift= interpolate_snr(snr_th)	
+		except ValueError:	#horizon outside the interpolated redshifts. Can potentially modify the interpolation range, but we basically can not observe the type of source or the source has to be catastrophically close.
+			print "Horizon further than z=100 or less than z=0.001"
+			return
+				
 	#sampled universal antenna power pattern for code sped up
 	w_sample,P_sample=genfromtxt("../data/Pw_single.dat",unpack=True)
 	P=interp1d(w_sample, P_sample,bounds_error=False,fill_value=0.0)
-	n_zstep=100
+	n_zstep=200
 
 	z,dz=linspace(horizon_redshift,0,n_zstep,endpoint=False,retstep=True)
 	dz=abs(dz)
-	unit_volume=zeros(size(z))
+	unit_volume=zeros(size(z)); compensate_detect_frac=zeros(size(z))
 	for i in range(0,size(z)):	
 		hplus_tilda,hcross_tilda,freqs = get_htildas((1.+z[i])*m1,(1.+z[i])*m2 ,cd.luminosity_distance(z[i],**cosmo) ,fmin=fmin,fref=fref,df=df,approx=approx)
 		fsel=logical_and(freqs>minimum_freq,freqs<maximum_freq)
 		psd_interp = interpolate_psd(freqs[fsel])  
 		optsnr_z=compute_horizonSNR(hplus_tilda,psd_interp,fsel,df)
 		w=snr_th/optsnr_z
+		compensate_detect_frac[i]=P(w)		
 		unit_volume[i]=(cd.comoving_volume(z[i]+dz/2.,**cosmo)-cd.comoving_volume(z[i]-dz/2.,**cosmo))/(1.+z[i])*P(w)
+
+	#Find out the redshift at which we detect 50%/90% of the sources at the redshift
+	z_reach50=max(z[where(compensate_detect_frac>=0.5)])
+	z_reach90=max(z[where(compensate_detect_frac>=0.1)])
+
 	vol_sum=sum(unit_volume)
-	#Find out the redshifts that 50%/90% of the sources lie within
+	#Find out the redshifts that 50%/90% of the sources lie within assuming constant-comoving-rate density
 	z50=max(z[where(cumsum(unit_volume)>=0.5*vol_sum)])
 	z90=max(z[where(cumsum(unit_volume)>=0.1*vol_sum)])
 	
-	return horizon_redshift,cd.luminosity_distance(horizon_redshift,**cosmo), cd.luminosity_distance(z50,**cosmo),  cd.luminosity_distance(z90,**cosmo), vol_sum
-	
-
-
+	#Find out the redshifts that 50%/90% of the sources lie within assuming star formation rate
+	sfr_vol_sum=sum(unit_volume*sfr(z))
+	sfr_z50=max(z[where(cumsum(unit_volume*sfr(z))>=0.5*sfr_vol_sum)])
+	sfr_z90=max(z[where(cumsum(unit_volume*sfr(z))>=0.1*sfr_vol_sum)])
+		
+	return horizon_redshift, cd.luminosity_distance(horizon_redshift,**cosmo), cd.luminosity_distance(z50,**cosmo),  cd.luminosity_distance(z90,**cosmo), (3.*vol_sum/4./pi)**(1./3.), vol_sum
