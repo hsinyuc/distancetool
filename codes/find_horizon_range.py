@@ -1,7 +1,6 @@
 """
-Calculate the horizon and range for a given 
-binary. The horizon is defined as the distance at which a face-on and overhead (ideally located) binary is detected 
-with SNR=snr_threshold with single IFO. It represents the farthest this binary could be detected above threshold. 
+Calculate the horizon, volume and distance measure for a given type of binary. 
+The horizon is defined as the furthest distance of an optimally orientated binary a detector can detect.
 
 Usage:
 
@@ -15,12 +14,17 @@ Optional inputs--
 approx: frequency domain waveform. Default is IMRPhenomD.
 
 Output--
-Horizon redshift, 
-Horizon luminosity distance (Mpc), 
-50% of the detected sources lie within the luminosity distance (Mpc), 
-90% of the detected sources lie within the luminosity distance (Mpc), 
-range in comoving distance (Mpc)
-detectable comoving volume (Mpc^3)
+Range (Mpc);
+Redshift at which the detector can detect 50% of the uniformly distributed sources;
+Redshift at which the detector can detect 10% of the uniformly distributed sources;
+Redshift of the horizon;
+Constant comoving time volume (Gpc^3);
+Redshift within which 50% of the detected sources lie;
+Redshift within which 90% of the detected sources lie;
+Redshift within which 50% of the detected sources lie, the source distribution follows a star formation rate;
+Redshift within which 90% of the detected sources lie, the source distribution follows a star formation rate;
+Average redshift of the detected sources;
+Average redshift of the detected sources, the source distribution follows a star formation rate.
 
 Author: 
 Hsin-Yu Chen (hsin-yu.chen@ligo.org)
@@ -104,14 +108,13 @@ def find_horizon_range(m1,m2,asdfile,approx=ls.IMRPhenomD):
 
 	input_redshift=z0; guess_snr=0; njump=0
 	#evaluate the horizon recursively
-	while abs(guess_snr-snr_th)>snr_th*0.001 and njump<20: #require the error within 0.1%
+	while abs(guess_snr-snr_th)>snr_th*0.001 and njump<10: #require the error within 0.1%
 		try:
 			guess_redshift,guess_dist=horizon_dist_eval(input_dist,input_snr,input_redshift) #horizon guess based on the old SNR		
 			hplus_tilda,hcross_tilda,freqs= get_htildas((1.+guess_redshift)*m1,(1.+guess_redshift)*m2 ,guess_dist,iota=0.,fmin=fmin,fref=fref,df=df,approx=approx)
-		except RuntimeError:
-			print "Will try interpolation."
-		except ValueError:
-			print "Will try interpolation."
+		except:
+			njump=10
+			print "Will try interpolation."		
 		fsel=logical_and(freqs>minimum_freq,freqs<maximum_freq)
 		psd_interp = interpolate_psd(freqs[fsel]) 		
 		guess_snr=compute_horizonSNR(hplus_tilda,psd_interp,fsel,df) #calculate the new SNR
@@ -124,7 +127,7 @@ def find_horizon_range(m1,m2,asdfile,approx=ls.IMRPhenomD):
 
 	#at high redshift the recursive jumps lead to too big a jump for each step, and the recursive loop converge slowly.
 	#so I interpolate the z-SNR curve directly.	
-	if njump>=20:
+	if njump>=10:
 		print "Recursive search for the horizon failed. Interpolation instead."
 		try:
 			interp_z=linspace(0.001,100,200); interp_snr=zeros(size(interp_z))
@@ -137,11 +140,12 @@ def find_horizon_range(m1,m2,asdfile,approx=ls.IMRPhenomD):
 			interpolate_snr = interp1d(interp_snr[::-1],interp_z[::-1])
 			horizon_redshift= interpolate_snr(snr_th)	
 		except RuntimeError: #If the sources lie outside the given interpolating redshift the sources can not be observe, so I cut down the interpolation range.
+			print "some of the SNR at the interpolated redshifts cannot be calculated."
 			interpolate_snr = interp1d(interp_snr[::-1],interp_z[::-1])
 			horizon_redshift= interpolate_snr(snr_th)	
 		except ValueError:	#horizon outside the interpolated redshifts. Can potentially modify the interpolation range, but we basically can not observe the type of source or the source has to be catastrophically close.
 			print "Horizon further than z=100 or less than z=0.001"
-			return
+			return	
 				
 	#sampled universal antenna power pattern for code sped up
 	w_sample,P_sample=genfromtxt("../data/Pw_single.dat",unpack=True)
@@ -159,7 +163,7 @@ def find_horizon_range(m1,m2,asdfile,approx=ls.IMRPhenomD):
 		w=snr_th/optsnr_z
 		compensate_detect_frac[i]=P(w)		
 		unit_volume[i]=(cd.comoving_volume(z[i]+dz/2.,**cosmo)-cd.comoving_volume(z[i]-dz/2.,**cosmo))/(1.+z[i])*P(w)
-
+	
 	#Find out the redshift at which we detect 50%/90% of the sources at the redshift
 	z_reach50=max(z[where(compensate_detect_frac>=0.5)])
 	z_reach90=max(z[where(compensate_detect_frac>=0.1)])
@@ -168,10 +172,15 @@ def find_horizon_range(m1,m2,asdfile,approx=ls.IMRPhenomD):
 	#Find out the redshifts that 50%/90% of the sources lie within assuming constant-comoving-rate density
 	z50=max(z[where(cumsum(unit_volume)>=0.5*vol_sum)])
 	z90=max(z[where(cumsum(unit_volume)>=0.1*vol_sum)])
-	
+
 	#Find out the redshifts that 50%/90% of the sources lie within assuming star formation rate
 	sfr_vol_sum=sum(unit_volume*sfr(z))
 	sfr_z50=max(z[where(cumsum(unit_volume*sfr(z))>=0.5*sfr_vol_sum)])
 	sfr_z90=max(z[where(cumsum(unit_volume*sfr(z))>=0.1*sfr_vol_sum)])
+
+	#average redshift
+	z_mean=sum(unit_volume*z)/vol_sum
+	sfr_z_mean=sum(unit_volume*sfr(z)*z)/sfr_vol_sum
+
 		
-	return horizon_redshift, cd.luminosity_distance(horizon_redshift,**cosmo), cd.luminosity_distance(z50,**cosmo),  cd.luminosity_distance(z90,**cosmo), (3.*vol_sum/4./pi)**(1./3.), vol_sum
+	return (3.*vol_sum/4./pi)**(1./3.),z_reach50,z_reach90,horizon_redshift,vol_sum/1E9,z50,z90,sfr_z50,sfr_z90,z_mean,sfr_z_mean  
