@@ -1,11 +1,10 @@
 """
-Calculate the horizon and range for a given 
-binary. The horizon is defined as the distance at which a face-on and overhead (ideally located) binary is detected 
-with SNR=snr_threshold with single IFO. It represents the farthest this binary could be detected above threshold. 
+Calculate the horizon, volume and distance measure for a given type of binary. 
+The horizon is defined as the furthest distance of an optimally orientated binary a detector network can detect.
 
 Usage:
 
-find_horizon_range(m1,m2,asdfile,approx=ls.IMRPhenomD)
+find_horizon_range(m1,m2,network,asdfile,pwfile,approx=ls.IMRPhenomD)
 
 Input--
 m1,m2: binary component masses in solar mass
@@ -214,4 +213,4 @@ def find_horizon_range(m1,m2,network,asdfile,pwfile,approx=ls.IMRPhenomD):
 	sfr_z_mean=sum(unit_volume*sfr(z)*z)/sfr_vol_sum
 		
 	return (3.*vol_sum/4./pi)**(1./3.),z_reach50,z_reach90,horizon_redshift,vol_sum/1E9,z50,z90,sfr_z50,sfr_z90,z_mean,sfr_z_mean  
-	
+
