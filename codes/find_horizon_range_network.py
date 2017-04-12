@@ -9,17 +9,26 @@ find_horizon_range(m1,m2,asdfile,approx=ls.IMRPhenomD)
 
 Input--
 m1,m2: binary component masses in solar mass
-asdfile: noise curve file [frequency, strain]
+network: list of detector acronym in the network, e.g. ['H','L','V']. 'H': LIGO-Hanford  'L': LIGO-Livingston 'V': Virgo 'J': KAGRA 'I':LIGO-India
+asdfile: list of noise curve file [frequency, strain].
+pwfile: antenna power pattern file depending on the network.
 
 Optional inputs--
 approx: frequency domain waveform. Default is IMRPhenomD.
 
 Output--
-Horizon redshift, 
-Horizon luminosity distance (Mpc), 
-50% of the detected sources lie within the luminosity distance (Mpc), 
-90% of the detected sources lie within the luminosity distance (Mpc), 
-detectable comoving volume (Mpc^3)
+Range (Mpc);
+Redshift at which the detector network can detect 50% of the uniformly distributed sources;
+Redshift at which the detector network can detect 10% of the uniformly distributed sources;
+Redshift of the horizon;
+Constant comoving time volume (Gpc^3);
+Redshift within which 50% of the detected sources lie;
+Redshift within which 90% of the detected sources lie;
+Redshift within which 50% of the detected sources lie, the source distribution follows a star formation rate;
+Redshift within which 90% of the detected sources lie, the source distribution follows a star formation rate;
+Average redshift of the detected sources;
+Average redshift of the detected sources, the source distribution follows a star formation rate.
+ 
 
 Author: 
 Hsin-Yu Chen (hsin-yu.chen@ligo.org)
@@ -35,7 +44,7 @@ from scipy.optimize import leastsq
 from scipy.interpolate import interp1d
 
 global snr_th,cosmo
-snr_th=8.
+snr_th=12.
 cosmo = {'omega_M_0':0.308, 'omega_lambda_0':0.692, 'omega_k_0':0.0, 'h':0.678}
 
 ##find redshift for a given luminosity distance
@@ -167,7 +176,6 @@ def find_horizon_range(m1,m2,network,asdfile,pwfile,approx=ls.IMRPhenomD):
 		except ValueError:	#horizon outside the interpolated redshifts. Can potentially modify the interpolation range, but we basically can not observe the type of source or the source has to be catastrophically close.
 			print "Horizon further than z=100 or less than z=0.001. Need to modify the interpolated redshift range."
 			return	
-	print "horizon redshift ", horizon_redshift
 		
 	#sampled universal antenna power pattern for code sped up
 	w_sample,P_sample=genfromtxt('../data/pw_'+pwfile+'.txt',unpack=True)
@@ -204,46 +212,6 @@ def find_horizon_range(m1,m2,network,asdfile,pwfile,approx=ls.IMRPhenomD):
 	#average redshift
 	z_mean=sum(unit_volume*z)/vol_sum
 	sfr_z_mean=sum(unit_volume*sfr(z)*z)/sfr_vol_sum
-
-
-	print "horizon redshift ", horizon_redshift
-	print "horizon luminosity distance ", cd.luminosity_distance(horizon_redshift,**cosmo)
-	print "volume ",  vol_sum/1E9	
-	print "range ", (3.*vol_sum/4./pi)**(1./3.)
-	print "Average z ", z_mean
-	print "SFR Average z ", sfr_z_mean
-	print "z50 ", z50
-	print "z50, luminsoity distance ", cd.luminosity_distance(z50,**cosmo)
-	print "z90 ", z90
-	print "z90, luminsoity distance ", cd.luminosity_distance(z90,**cosmo)
-	print "SFR weighted z50 ", sfr_z50
-	print "SFR weighted z50, luminsoity distance ", cd.luminosity_distance(sfr_z50,**cosmo)
-	print "SFR weighted z90 ", sfr_z90
-	print "SFR weighted z90, luminsoity distance ", cd.luminosity_distance(sfr_z90,**cosmo)
-	print "reach50, redshift ",z_reach50
-	print "reach50, luminosity distance ", cd.luminosity_distance(z_reach50,**cosmo)
-	print "reach90, redshift ",z_reach90
-	print "reach90, luminosity distance ", cd.luminosity_distance(z_reach90,**cosmo)
-
 		
 	return (3.*vol_sum/4./pi)**(1./3.),z_reach50,z_reach90,horizon_redshift,vol_sum/1E9,z50,z90,sfr_z50,sfr_z90,z_mean,sfr_z_mean  
 	
-dir='/Users/hsinyuc/research/'
-
-advanced_asd=dir+'followup/data/curves.txt'
-aligo=dir+'followup/data/psd_aligo_120mpc.txt'
-adv=dir+'followup/data/psd_adv_60mpc.txt'
-o2h1=dir+'followup/data/2016-12-13_C01_H1_O2_Sensitivity_strain_asd.txt'
-o2l1=dir+'followup/data/2016-12-13_C01_L1_O2_Sensitivity_strain_asd.txt'
-ce=dir+'localization3g/data/curves_June_2016/CE.txt'
-et=dir+'localization3g/data/curves_June_2016/ET_D.txt'
-
-
-m1=30.
-m2=30.
-network=['H','L','V',]
-asdfile=[advanced_asd,advanced_asd,advanced_asd,advanced_asd,advanced_asd]
-pwfile='hlv'
-
-find_horizon_range(m1,m2,network,asdfile,pwfile,approx=ls.IMRPhenomD)
-#savetxt('/Users/hsinyuc/research/distance/data2/detvolume_o3_120_60_hlv_bns_tf2.txt',array([horizon_redshift,vol_sum]))
