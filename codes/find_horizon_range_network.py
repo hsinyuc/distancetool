@@ -79,7 +79,8 @@ def get_htildas(m1,m2,dist,
 		   phase_order=-1, 
 		   approx=ls.IMRPhenomD,
 		   ):
-	hplus_tilda, hcross_tilda = ls.SimInspiralChooseFDWaveform(phase, df, m1*lal.MSUN_SI, m2*lal.MSUN_SI, s1x, s1y, s1z, s2x, s2y, s2z, fmin, fmax, fref, dist*(1E6 * ls.lal.PC_SI), iota, lambda1, lambda2, waveFlags, nonGRparams, amp_order, phase_order, approx)
+	#hplus_tilda, hcross_tilda = ls.SimInspiralChooseFDWaveform(phase, df, m1*lal.MSUN_SI, m2*lal.MSUN_SI, s1x, s1y, s1z, s2x, s2y, s2z, fmin, fmax, fref, dist*(1E6 * ls.lal.PC_SI), iota, lambda1, lambda2, waveFlags, nonGRparams, amp_order, phase_order, approx)
+	hplus_tilda, hcross_tilda = ls.SimInspiralChooseFDWaveform(m1*lal.MSUN_SI, m2*lal.MSUN_SI, s1x, s1y, s1z, s2x, s2y, s2z, dist*(1E6 * ls.lal.PC_SI),iota,phase, longAscNodes,eccentricity,meanPerAno,df,fmin, fmax, fref,LALpars,approx)
 	freqs=array([hplus_tilda.f0+i*hplus_tilda.deltaF for i in arange(hplus_tilda.data.length)])
 	return hplus_tilda.data.data,hcross_tilda.data.data,freqs
 
@@ -103,7 +104,8 @@ def compute_horizonSNR(hplus_tilda,hcross_tilda,network,ra,dec,psi,psd_interp,fs
     return sqrt(snrsq)
 
 def sfr(z):
-    return 0.015*(1.+z)**2.7/(1.+(1.+z)/2.9)**5.6  #msun per yr per Mpc^3
+    return 0.015*(1.+z)**2.7/(1.+((1.+z)/2.9)**5.6) #msun per yr per Mpc^3
+
 
 #calculate the horizon distance/redshift
 def find_horizon_range(m1,m2,network,asdfile,pwfile,approx=ls.IMRPhenomD):
