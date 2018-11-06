@@ -67,15 +67,14 @@ def get_htildas(m1,m2,dist,
 		   fmax=0.,
 		   fref=1.,  
 		   iota=0., 
-		   lambda1=0., 
-		   lambda2=0., 
-		   waveFlags=None, 
-		   nonGRparams=None, 
-		   amp_order=0, 
-		   phase_order=-1, 
-		   approx=ls.IMRPhenomD,
+		   longAscNodes=0.,
+		   eccentricity=0.,
+		   meanPerAno=0.,
+		   LALpars=None,
+		   approx=ls.IMRPhenomD
 		   ):
-	hplus_tilda, hcross_tilda = ls.SimInspiralChooseFDWaveform(phase, df, m1*lal.MSUN_SI, m2*lal.MSUN_SI, s1x, s1y, s1z, s2x, s2y, s2z, fmin, fmax, fref, dist*(1E6 * ls.lal.PC_SI), iota, lambda1, lambda2, waveFlags, nonGRparams, amp_order, phase_order, approx)
+	#hplus_tilda, hcross_tilda = ls.SimInspiralChooseFDWaveform(phase, df, m1*lal.MSUN_SI, m2*lal.MSUN_SI, s1x, s1y, s1z, s2x, s2y, s2z, fmin, fmax, fref, dist*(1E6 * ls.lal.PC_SI), iota, lambda1, lambda2, waveFlags, nonGRparams, amp_order, phase_order, approx)
+	hplus_tilda, hcross_tilda = ls.SimInspiralChooseFDWaveform(m1*lal.MSUN_SI, m2*lal.MSUN_SI, s1x, s1y, s1z, s2x, s2y, s2z, dist*(1E6 * ls.lal.PC_SI),iota,phase, longAscNodes,eccentricity,meanPerAno,df,fmin, fmax, fref,LALpars,approx)
 	freqs=array([hplus_tilda.f0+i*hplus_tilda.deltaF for i in arange(hplus_tilda.data.length)])
 	return hplus_tilda.data.data,hcross_tilda.data.data,freqs
 
@@ -84,7 +83,7 @@ def compute_horizonSNR(hplus_tilda,psd_interp,fsel,df):
 	return sqrt(4.*df*sum(abs(hplus_tilda[fsel])**2/psd_interp))        
 
 def sfr(z):
-    return 0.015*(1.+z)**2.7/(1.+(1.+z)/2.9)**5.6  #msun per yr per Mpc^3
+    return 0.015*(1.+z)**2.7/(1.+((1.+z)/2.9)**5.6) #msun per yr per Mpc^3
 
 #calculate the horizon distance/redshift
 def find_horizon_range(m1,m2,asdfile,approx=ls.IMRPhenomD):
@@ -124,6 +123,8 @@ def find_horizon_range(m1,m2,asdfile,approx=ls.IMRPhenomD):
 		input_dist=guess_dist
 		njump+=1
 	horizon_redshift=guess_redshift
+
+	print horizon_redshift
 
 	#at high redshift the recursive jumps lead to too big a jump for each step, and the recursive loop converge slowly.
 	#so I interpolate the z-SNR curve directly.	
@@ -184,3 +185,4 @@ def find_horizon_range(m1,m2,asdfile,approx=ls.IMRPhenomD):
 
 		
 	return (3.*vol_sum/4./pi)**(1./3.),z_reach50,z_reach90,horizon_redshift,vol_sum/1E9,z50,z90,sfr_z50,sfr_z90,z_mean,sfr_z_mean  
+
