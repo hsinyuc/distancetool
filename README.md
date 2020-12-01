@@ -1,9 +1,8 @@
 # distancetool
-We are still working on a public usable version of the codes. If you are interested in how we calculate these distance measures, please look into the code. If you are desperate to use the code, please come back later when we have a more refined version for you to use.
 
-There is a web interface for convenient use: http://gwc.rcc.uchicago.edu
+There is also a web interface for convenient use: https://users.rcc.uchicago.edu/~dholz/gwc/
 
-If you use this code while preparing a paper, please cite Chen et al (2017).
+If you use this code while preparing a paper, please cite Chen et al (2017) arXiv:1709.08079.
 
 If you have any question, please contact Hsin-Yu Chen at hsin-yu.chen@ligo.org
 
