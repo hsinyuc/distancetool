@@ -42,7 +42,6 @@ from scipy.interpolate import interp1d
 
 global snr_th,cosmo
 snr_th=8.
-#cosmo = {'omega_M_0':0.308, 'omega_lambda_0':0.692, 'omega_k_0':0.0, 'h':0.678}
 cosmo = {'omega_M_0':0.3065, 'omega_lambda_0':0.6935, 'omega_k_0':0.0, 'h':0.679}
 
 ##find redshift for a given luminosity distance
@@ -166,7 +165,7 @@ def find_horizon_range(m1,m2,asdfile,approx=ls.IMRPhenomD):
     print("SNR ",compute_horizonSNR(hplus_tilda,psd_interp,fsel,df))	
     print(horizon_redshift)        
     #sampled universal antenna power pattern for code sped up
-    w_sample,P_sample=genfromtxt("Pw_single.dat",unpack=True)
+    w_sample,P_sample=genfromtxt("../data/Pw_single.dat",unpack=True)
     P=interp1d(w_sample, P_sample,bounds_error=False,fill_value=0.0)
     n_zstep=400
 
@@ -201,8 +200,4 @@ def find_horizon_range(m1,m2,asdfile,approx=ls.IMRPhenomD):
     z_mean=sum(unit_volume*z)/vol_sum
     sfr_z_mean=sum(unit_volume*sfr(z)/sfr(0)*z)/sfr_vol_sum
 
-
-    #return z,compensate_detect_frac,unit_volume,(3.*vol_sum/4./pi)**(1./3.),z_mean,sfr_z_mean 
-    #return horizon_redshift,vol_sum/1e9,z_response50,z_response10,z50,z90,sfr_z50,sfr_z90,z_mean,sfr_z_mean
-    return horizon_redshift,de.luminosity_distance_de(horizon_redshift,**cosmo),vol_sum/1e9,(de.comoving_volume_de(horizon_redshift,**cosmo)/vol_sum)**(1./3.)
-
+	return (3.*vol_sum/4./pi)**(1./3.),z_response50,z_response90,horizon_redshift,vol_sum/1E9,z50,z90,sfr_z50,sfr_z90,z_mean,sfr_z_mean  
