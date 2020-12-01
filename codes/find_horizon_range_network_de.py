@@ -45,7 +45,6 @@ from scipy.interpolate import interp1d
 
 global snr_th,cosmo
 snr_th=12.
-#cosmo = {'omega_M_0':0.308, 'omega_lambda_0':0.692, 'omega_k_0':0.0, 'h':0.678}
 cosmo = {'omega_M_0':0.3065, 'omega_lambda_0':0.6935, 'omega_k_0':0.0, 'h':0.679}
 
 ##find redshift for a given luminosity distance
@@ -115,7 +114,7 @@ def find_horizon_range(m1,m2,network,asdfile,pwfile,approx=ls.IMRPhenomD):
 	fref=10.
 	df=1.0
 	
-	ra,dec,psi,iota=genfromtxt('horizon_coord_'+pwfile+'.txt',unpack=True)
+	ra,dec,psi,iota=genfromtxt('../data/horizon_coord_'+pwfile+'.txt',unpack=True)
 	
 	psdinterp_dict={}
 	minimum_freq=zeros(size(network)); maximum_freq=zeros(size(network))
@@ -182,7 +181,7 @@ def find_horizon_range(m1,m2,network,asdfile,pwfile,approx=ls.IMRPhenomD):
 	#sampled universal antenna power pattern for code sped up
 	w_sample,P_sample=genfromtxt('pw_'+pwfile+'.txt',unpack=True)
 	P=interp1d(w_sample, P_sample,bounds_error=False,fill_value=0.0)
-	n_zstep=5000
+	n_zstep=400
 	print("horizon_redshift",horizon_redshift)
 	z,dz=linspace(horizon_redshift,0,n_zstep,endpoint=False,retstep=True)
 	dz=abs(dz)
@@ -199,8 +198,8 @@ def find_horizon_range(m1,m2,network,asdfile,pwfile,approx=ls.IMRPhenomD):
 		unit_volume[i]=(de.comoving_volume_de(z[i]+dz/2.,**cosmo)-de.comoving_volume_de(z[i]-dz/2.,**cosmo))/(1.+z[i])*P(w)
 	
 	#Find out the redshift at which we detect 50%/90% of the sources at the redshift
-	z_reach50=max(z[where(compensate_detect_frac>=0.5)])
-	z_reach90=max(z[where(compensate_detect_frac>=0.1)])
+	z_response50=max(z[where(compensate_detect_frac>=0.5)])
+	z_response90=max(z[where(compensate_detect_frac>=0.1)])
 
 	vol_sum=sum(unit_volume)
 	#Find out the redshifts that 50%/90% of the sources lie within assuming constant-comoving-rate density
@@ -218,5 +217,4 @@ def find_horizon_range(m1,m2,network,asdfile,pwfile,approx=ls.IMRPhenomD):
 	z_mean=sum(unit_volume*z)/vol_sum
 	sfr_z_mean=sum(unit_volume*sfr(z)/sfr(0)*z)/sfr_vol_sum
 		
-	#return (3.*vol_sum/4./pi)**(1./3.),z_reach50,z_reach90,horizon_redshift,vol_sum/1E9,z50,z90,sfr_z50,sfr_z90,z_mean,sfr_z_mean  
-	return horizon_redshift,vol_sum/1e9,sfr_vol_sum/1e9,(3.*vol_sum/4./pi)**(1./3.),sfr_z50,z,compensate_detect_frac,unit_volume,unit_volume*sfr(z)/sfr(0)
+	return (3.*vol_sum/4./pi)**(1./3.),z_response50,z_response90,horizon_redshift,vol_sum/1E9,z50,z90,sfr_z50,sfr_z90,z_mean,sfr_z_mean  
